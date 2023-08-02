@@ -13,33 +13,42 @@ models = {
         "param": "realesr-animevideov3-x2.param",
         "bin": "realesr-animevideov3-x2.bin",
         "scale": 2,
-        "max_long_side": 3500,
+        "max_long_side": 7000,
     },
     1: {
         "param": "realesr-animevideov3-x3.param",
         "bin": "realesr-animevideov3-x3.bin",
         "scale": 3,
-        "max_long_side": 2300,
+        "max_long_side": 7000,
     },
     2: {
         "param": "realesr-animevideov3-x4.param",
         "bin": "realesr-animevideov3-x4.bin",
         "scale": 4,
-        "max_long_side": 1750,
+        "max_long_side": 7000,
     },
     3: {
         "param": "realesrgan-x4plus-anime.param",
         "bin": "realesrgan-x4plus-anime.bin",
         "scale": 4,
-        "max_long_side": 1750,
+        "max_long_side": 7000,
     },
     4: {
         "param": "realesrgan-x4plus.param",
         "bin": "realesrgan-x4plus.bin",
         "scale": 4,
-        "max_long_side": 1750,
+        "max_long_side": 7000,
     },
 }
+
+# Ask user for the maximum long side size
+max_long_side_input = int(
+    input("Enter the maximum long side size for the upscaled images (e.g., 7000): ")
+)
+
+# Update the models with the user-specified max long side size
+for model_info in models.values():
+    model_info["max_long_side"] = max_long_side_input
 
 # Ask user for input directory
 input_dir = input("Enter the input directory path: ")
@@ -63,11 +72,13 @@ realesrgan = Realesrgan(
 )
 
 
-# Function to downscale the image if its long side exceeds the specified maximum and apply sharpening
-def downscale_image_with_sharpening(image, max_long_side):
+def downscale_image_with_sharpening(image, max_long_side, upscale_factor):
+    effective_max_long_side = (
+        max_long_side / upscale_factor
+    )  # Divide instead of multiply
     width, height = image.size
-    if max(width, height) > max_long_side:
-        scale_factor = max_long_side / max(width, height)
+    if max(width, height) * upscale_factor > effective_max_long_side:
+        scale_factor = effective_max_long_side / max(width, height)
         new_width = int(width * scale_factor)
         new_height = int(height * scale_factor)
         # Use OpenCV for resizing with Lanczos interpolation
@@ -110,7 +121,9 @@ for root, _, files in os.walk(input_dir):
             # Open the image and downscale if necessary based on the selected model
             image = Image.open(input_image_path).convert("RGB")
             max_long_side = model_config["max_long_side"]
-            image = downscale_image_with_sharpening(image, max_long_side)
+            image = downscale_image_with_sharpening(
+                image, max_long_side, model_config["scale"]
+            )
 
             # Upscale the downscaled and sharpened image using Realesrgan and measure time taken
             time_taken = upscale_image_and_measure_time(image, output_image_path)
@@ -138,8 +151,10 @@ json_filename = input("Enter the desired name for the JSON file (without extensi
 # Append ".json" extension to the filename
 json_filename += ".json"
 
-# Save the JSON output to the specified file in the root of the project
-output_json_path = os.path.join(os.getcwd(), json_filename)
+# Save the JSON output to the specified file in the root + "upscale-data" directory
+output_json_path = os.path.join("upscale-data", json_filename)
+if not os.path.exists("upscale-data"):
+    os.makedirs("upscale-data")
 with open(output_json_path, "w") as f:
     json.dump(output_json, f, indent=4)
 
