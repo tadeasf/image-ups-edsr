@@ -78,14 +78,17 @@ def downscale_image_with_sharpening(image, max_long_side):
         image = Image.fromarray(image_array)
         enhancer = ImageEnhance.Sharpness(image)
         sharpened_image = enhancer.enhance(2.0)
-    return sharpened_image
+        return sharpened_image
+    return image  # Return the original image if no downscaling is necessary
 
 
 # Function to upscale the image and measure time taken
-def upscale_image_and_measure_time(input_path, output_path):
+def upscale_image_and_measure_time(image, output_path):
     start_time = time.time()
-    image = cv2.imdecode(np.fromfile(input_path, dtype=np.uint8), cv2.IMREAD_COLOR)
+    image = np.array(image)
     image = realesrgan.process_cv2(image)
+    # Convert back to RGB from BGR
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     cv2.imencode(".jpg", image)[1].tofile(output_path)
     end_time = time.time()
     return end_time - start_time
@@ -109,10 +112,8 @@ for root, _, files in os.walk(input_dir):
             max_long_side = model_config["max_long_side"]
             image = downscale_image_with_sharpening(image, max_long_side)
 
-            # Upscale the downscaled image using Realesrgan and measure time taken
-            time_taken = upscale_image_and_measure_time(
-                input_image_path, output_image_path
-            )
+            # Upscale the downscaled and sharpened image using Realesrgan and measure time taken
+            time_taken = upscale_image_and_measure_time(image, output_image_path)
             upscale_times[file] = time_taken
             total_upscale_time += time_taken
 
@@ -140,6 +141,6 @@ json_filename += ".json"
 # Save the JSON output to the specified file in the root of the project
 output_json_path = os.path.join(os.getcwd(), json_filename)
 with open(output_json_path, "w") as f:
-    json.dump(output_json, f)
+    json.dump(output_json, f, indent=4)
 
 print(f"Upscaling process completed. JSON output saved to {json_filename}.")
